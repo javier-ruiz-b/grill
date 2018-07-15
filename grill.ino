@@ -33,7 +33,7 @@ float sensorTemperature(int rawAdc) {
 }
 
 float selectedTemperature(int rawAdc) {
-  const float highTemp = 250; // the real value is a 60% of this one
+  const float highTemp = 180;
   const float lowTemp = 12;
   return lowTemp + (highTemp-lowTemp)*(1024-rawAdc)/1024.0f;
 }
@@ -50,17 +50,15 @@ bool shouldWaitOff() {
 void updateRelayDelays(float sensorTemp, float selectedTemp) {
   const int minDelay = 3  * 1000;
   const int maxDelay = 30 * 1000;
-  float delayOnAbsoluteTemperatureMs = 10000.0f / (1.0f + (300.0f - sensorTemp)); //25º: 357, 300º: 10000
-  float delayOnTemperatureDifferenceMs = (selectedTemp - sensorTemp)*1000;
-  float delayRelayOnMsFloat = delayOnAbsoluteTemperatureMs + delayOnTemperatureDifferenceMs;
-  delayRelayOnMsFloat = min(float(maxDelay), delayRelayOnMsFloat);
-  delayRelayOnMsFloat = max(float(minDelay), delayRelayOnMsFloat);
-  delayRelayOnMsFloat *= 0.75f;
+  float delayOnTempDifferenceMs = (selectedTemp - sensorTemp)*1000;
+  delayOnTempDifferenceMs = min(float(maxDelay), delayOnTempDifferenceMs);
+  delayOnTempDifferenceMs = max(float(minDelay), delayOnTempDifferenceMs);
+  delayOnTempDifferenceMs *= 0.75f;
   bool wasBeforeOn = delayRelayOnMs == 0 && delayRelayOffMs > 0;
   if (!wasBeforeOn && meanRelayStatus < 0.5) {
-    delayRelayOnMs = int(delayRelayOnMsFloat);
+    delayRelayOnMs = int(delayOnTempDifferenceMs);
   }
-  delayRelayOffMs = 30*1000 - int(delayRelayOnMsFloat);
+  delayRelayOffMs = 30*1000 - int(delayOnTempDifferenceMs);
 }
 
 bool shouldActivateRelay(float sensorTemp, float selectedTemp) {
@@ -69,7 +67,7 @@ bool shouldActivateRelay(float sensorTemp, float selectedTemp) {
     return false;
   }
   
-  const float MIN_TEMP_DIFFERENCE = 42;
+  const float MIN_TEMP_DIFFERENCE = 50;
   if ((selectedTemp - sensorTemp) > MIN_TEMP_DIFFERENCE) {
     resetDelays();
     return true;
@@ -98,9 +96,10 @@ bool shouldActivateRelayAndUpdateMeanStatus(float sensorTemp, float selectedTemp
   if ((hadRemainingDelayOn  != hasRemainingDelayOn) ||
       (hadRemainingDelayOff != hasRemainingDelayOff)) {
     updateRelayDelays(sensorTemp, selectedTemp);
+    shouldActivate = shouldActivateRelay(sensorTemp, selectedTemp);
   }
   
-  meanRelayStatus = meanRelayStatus*0.96f + (shouldActivate ? 1 : 0) * 0.04f;
+  meanRelayStatus = meanRelayStatus*0.965f + (shouldActivate ? 1 : 0) * 0.035f;
   return shouldActivate;
 }
 
